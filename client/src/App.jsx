@@ -10,6 +10,8 @@ export default function App() {
   const [listening, setListening] = useState(false);
   const [recognition, setRecognition] = useState(null);
 
+  const backendUrl = import.meta.env.VITE_URL
+
   useEffect(() => {
     if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
       const SpeechRecognition =
@@ -41,7 +43,7 @@ export default function App() {
     setResult(null);
 
     try {
-      const res = await axios.post("http://localhost:4000/api/summarize", {
+      const res = await axios.post(backendUrl+"api/summarize", {
         text,
       });
 
