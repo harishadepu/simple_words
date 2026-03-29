@@ -1,56 +1,68 @@
 import express from "express";
-import dotenv from "dotenv";
 import cors from "cors";
-
-import {buildPrompt} from './src/prompt.js'
-import { main } from "./src/llm.js";
-import { validateInput } from "./src/validate.js";
+import bodyParser from "body-parser";
+import dotenv from "dotenv";
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(bodyParser.json());
 
-app.get('/',(req,res)=>{
-    res.send('server running')
-})
+// Load from environment
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-app.post("/api/summarize", async (req, res) => {
-  const { text } = req.body;
-
-  // ✅ Validate input
-  const error = validateInput(text);
-  if (error) {
-    return res.status(400).json({ error });
-  }
+// Route: Enhance text
+app.post("/api/enhance-text", async (req, res) => {
+  const { prompt } = req.body;
 
   try {
-    const prompt = buildPrompt(text);
-
-    const raw = await main(prompt);
-
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return res.status(500).json({
-        error: "Failed to parse LLM response",
-      });
-    }
-
-    res.json(parsed);
-
-  } catch (err) {
-    console.error("LLM ERROR:", err);
-    res.status(500).json({
-      error: err.message || "LLM request failed",
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: "You are a helpful assistant that improves user prompts for clarity, tone, and creativity." },
+          { role: "user", content: prompt }
+        ]
+      })
     });
+
+    const data = await response.json();
+    const enhancedText = data.choices[0].message.content;
+    res.json({ enhancedText });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
-const PORT = process.env.PORT;
+// Route: Generate image
+app.post("/api/generate-image", async (req, res) => {
+  const { prompt } = req.body;
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  try {
+    const response = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "gpt-image-1",
+        prompt,
+        size: "512x512"
+      })
+    });
+
+    const data = await response.json();
+    res.json({ imageUrl: data.data[0].url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
+
+app.listen(5000, () => console.log("Server running on http://localhost:5000"));

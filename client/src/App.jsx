@@ -1,107 +1,156 @@
-import { useState, useEffect } from "react";
+import React, { useState } from "react";
 import axios from "axios";
-import ResultCard from "./components/ResultCard";
+import "./App.css";
 
-export default function App() {
-  const [text, setText] = useState("");
-  const [result, setResult] = useState(null);
+function App() {
+  const [prompt, setPrompt] = useState("");
+  const [enhancedPrompt, setEnhancedPrompt] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [uploadedImage, setUploadedImage] = useState(null);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [listening, setListening] = useState(false);
-  const [recognition, setRecognition] = useState(null);
 
-  const backendUrl = import.meta.env.VITE_URL
+  const [workflow, setWorkflow] = useState({
+    text: true,
+    upload: false,
+    generate: false,
+  });
 
-  useEffect(() => {
-    if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
-      const SpeechRecognition =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
-      const recog = new SpeechRecognition();
-      recog.continuous = false;
-      recog.interimResults = false;
-      recog.lang = "en-US";
-
-      recog.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setText(transcript); // put voice text into textarea
-      };
-
-      recog.onend = () => setListening(false);
-
-      setRecognition(recog);
-    }
-  }, []);
-
-  const handleSubmit = async () => {
-    if (!text || typeof text !== "string" || !text.trim()) {
-      setError("Please enter valid text.");
-      return;
-    }
-
-    setLoading(true);
+  const handleCheckboxChange = (e) => {
+    const { name, checked } = e.target;
+    setWorkflow((prev) => ({ ...prev, [name]: checked }));
     setError("");
-    setResult(null);
+  };
 
+  const handleEnhance = async () => {
     try {
-      const res = await axios.post(backendUrl+"api/summarize", {
-        text,
-      });
-
-      const data = res.data; // axios gives parsed JSON here
-      setResult(data);
+      const res = await axios.post("http://localhost:5000/api/enhance-text", { prompt });
+      setEnhancedPrompt(res.data.enhancedText);
     } catch (err) {
-      setError("Something went wrong.");
-    } finally {
-      setLoading(false);
+      const message = err.response?.data?.error || err.message;
+      setError("Error enhancing text: " + message);
     }
   };
 
-  const startListening = () => {
-    if (recognition) {
-      setListening(true);
-      recognition.start();
-    } else {
-      setError("Speech recognition not supported in this browser.");
+  const handleGenerateImage = async () => {
+    try {
+      const res = await axios.post("http://localhost:5000/api/generate-image", { prompt: enhancedPrompt || prompt });
+      setImageUrl(res.data.imageUrl);
+    } catch (err) {
+      const message = err.response?.data?.error || err.message;
+      setError("Error generating image: " + message);
+    }
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    setUploadedImage(URL.createObjectURL(file));
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    try {
+      const res = await axios.post("http://localhost:5000/api/analyze-image", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      alert("Image analysis result: " + JSON.stringify(res.data));
+    } catch (err) {
+      const message = err.response?.data?.error || err.message;
+      setError("Error analyzing image: " + message);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
-      <h1 className="text-center text-3xl font-bold text-gray-800">
-        Messy Text into Structured Text
-      </h1>
-      <div className="w-full max-w-2xl bg-white shadow-xl rounded-2xl p-6 space-y-5">
-        <h1 className="text-2xl font-semibold text-gray-800">LLM Summarizer</h1>
+    <div className="app-container">
+      <h1>AI Workflow Selector</h1>
 
-        <textarea
-          rows={8}
-          className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-          placeholder="Paste or speak your text here..."
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-        />
-
-        <div className="flex gap-2">
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50"
-          >
-            {loading ? "Processing..." : "Summarize"}
-          </button>
-
-          <button
-            onClick={startListening}
-            className={`px-4 py-2 rounded-lg font-medium ${
-              listening ? "bg-red-500 text-white" : "bg-gray-300"
-            }`}
-          >
-            🎤 {listening ? "Listening..." : "Talk"}
-          </button>
+      {enhancedPrompt && (
+        <div>
+          <h3>Enhanced Prompt:</h3>
+          <p>{enhancedPrompt}</p>
         </div>
+      )}
 
-        <ResultCard error={error} result={result} />
+      {/* Workflow Selection */}
+      <div className="workflow-selector">
+        <label>
+          <input
+            type="checkbox"
+            name="text"
+            checked={workflow.text}
+            onChange={handleCheckboxChange}
+          />
+          Text Workflow
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            name="upload"
+            checked={workflow.upload}
+            onChange={handleCheckboxChange}
+          />
+          Image Upload Workflow
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            name="generate"
+            checked={workflow.generate}
+            onChange={handleCheckboxChange}
+          />
+          Generate Image Workflow
+        </label>
       </div>
+
+      {/* Text Workflow */}
+      {workflow.text && (
+        <div className="workflow-block">
+          <textarea
+            rows="4"
+            placeholder="Enter your text prompt..."
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+          />
+          <button onClick={handleEnhance}>Enhance Text</button>
+        </div>
+      )}
+
+      {/* Image Upload Workflow */}
+      {workflow.upload && (
+        <div className="workflow-block">
+          <h3>Upload an Image</h3>
+          <input type="file" accept="image/*" onChange={handleImageUpload} />
+          {uploadedImage && (
+            <div>
+              <h4>Uploaded Image Preview:</h4>
+              <img src={uploadedImage} alt="Uploaded" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Generate Image Workflow */}
+      {workflow.generate && (
+        <div className="workflow-block">
+          <textarea
+            rows="4"
+            placeholder="Enter your text prompt..."
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+          />
+          <button onClick={handleGenerateImage}>Generate Image</button>
+          {imageUrl && (
+            <div>
+              <h3>Generated Image:</h3>
+              <img src={imageUrl} alt="Generated" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Error Message */}
+      {error && <div className="error-message">{error}</div>}
     </div>
   );
 }
+
+export default App;
