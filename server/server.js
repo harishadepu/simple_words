@@ -10,7 +10,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Load from environment
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENAI_API_KEY = process.env.DEEPSEEK_API_KEY;
 
 // Route: Enhance text
 app.post("/api/enhance-text", async (req, res) => {

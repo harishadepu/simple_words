@@ -20,10 +20,11 @@ function App() {
     setWorkflow((prev) => ({ ...prev, [name]: checked }));
     setError("");
   };
+  const backendUrl = import.meta.env.VITE_URL
 
   const handleEnhance = async () => {
     try {
-      const res = await axios.post("http://localhost:5000/api/enhance-text", { prompt });
+      const res = await axios.post(`${backendUrl}+"/api/enhance-text", ${ prompt }`);
       setEnhancedPrompt(res.data.enhancedText);
     } catch (err) {
       const message = err.response?.data?.error || err.message;
@@ -33,7 +34,7 @@ function App() {
 
   const handleGenerateImage = async () => {
     try {
-      const res = await axios.post("http://localhost:5000/api/generate-image", { prompt: enhancedPrompt || prompt });
+      const res = await axios.post(`${backendUrl}+"/api/generate-image", { prompt: enhancedPrompt || prompt }`);
       setImageUrl(res.data.imageUrl);
     } catch (err) {
       const message = err.response?.data?.error || err.message;
@@ -49,7 +50,7 @@ function App() {
     formData.append("image", file);
 
     try {
-      const res = await axios.post("http://localhost:5000/api/analyze-image", formData, {
+      const res = await axios.post(`${backendUrl}+"/api/analyze-image"`, formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
       alert("Image analysis result: " + JSON.stringify(res.data));
